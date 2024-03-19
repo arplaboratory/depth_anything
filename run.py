@@ -73,7 +73,7 @@ if __name__ == '__main__':
         image = torch.from_numpy(image).unsqueeze(0).to(DEVICE)
         
         with torch.no_grad():
-            depth = depth_anything(image)
+            depth = depth_anything(image)[1]
         
         depth = F.interpolate(depth[None], (h, w), mode='bilinear', align_corners=False)[0, 0]
         depth = (depth - depth.min()) / (depth.max() - depth.min()) * 255.0

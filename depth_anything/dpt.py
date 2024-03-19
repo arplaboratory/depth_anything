@@ -100,9 +100,9 @@ class DPTHead(nn.Module):
                 nn.Identity(),
             )
             
-    def forward(self, out_features, patch_h, patch_w):
-        out = []
-        for i, x in enumerate(out_features):
+    def forward(self, features, patch_h, patch_w):
+        out_features = []
+        for i, x in enumerate(features):
             if self.use_clstoken:
                 x, cls_token = x[0], x[1]
                 readout = cls_token.unsqueeze(1).expand_as(x)
@@ -115,9 +115,9 @@ class DPTHead(nn.Module):
             x = self.projects[i](x)
             x = self.resize_layers[i](x)
             
-            out.append(x)
+            out_features.append(x)
         
-        layer_1, layer_2, layer_3, layer_4 = out
+        layer_1, layer_2, layer_3, layer_4 = out_features
         
         layer_1_rn = self.scratch.layer1_rn(layer_1)
         layer_2_rn = self.scratch.layer2_rn(layer_2)
@@ -129,11 +129,11 @@ class DPTHead(nn.Module):
         path_2 = self.scratch.refinenet2(path_3, layer_2_rn, size=layer_1_rn.shape[2:])
         path_1 = self.scratch.refinenet1(path_2, layer_1_rn)
         
-        out = self.scratch.output_conv1(path_1)
-        out = F.interpolate(out, (int(patch_h * 14), int(patch_w * 14)), mode="bilinear", align_corners=True)
-        out = self.scratch.output_conv2(out)
+        out_depth = self.scratch.output_conv1(path_1)
+        out_depth = F.interpolate(out_depth, (int(patch_h * 14), int(patch_w * 14)), mode="bilinear", align_corners=True)
+        out_depth = self.scratch.output_conv2(out_depth)
         
-        return out
+        return out_features, out_depth
         
         
 class DPT_DINOv2(nn.Module):
@@ -159,11 +159,11 @@ class DPT_DINOv2(nn.Module):
         
         patch_h, patch_w = h // 14, w // 14
 
-        depth = self.depth_head(features, patch_h, patch_w)
-        depth = F.interpolate(depth, size=(h, w), mode="bilinear", align_corners=True)
-        depth = F.relu(depth)
+        out_features, out_depth = self.depth_head(features, patch_h, patch_w)
+        out_depth = F.interpolate(out_depth, size=(h, w), mode="bilinear", align_corners=True)
+        out_depth = F.relu(out_depth)
 
-        return depth.squeeze(1)
+        return out_features, out_depth.squeeze(1)
 
 
 class DepthAnything(DPT_DINOv2, PyTorchModelHubMixin):
