@@ -123,18 +123,17 @@ class DPTHead(nn.Module):
         layer_2_rn = self.scratch.layer2_rn(layer_2)
         layer_3_rn = self.scratch.layer3_rn(layer_3)
         layer_4_rn = self.scratch.layer4_rn(layer_4)
-        
+
         path_4 = self.scratch.refinenet4(layer_4_rn, size=layer_3_rn.shape[2:])
         path_3 = self.scratch.refinenet3(path_4, layer_3_rn, size=layer_2_rn.shape[2:])
         path_2 = self.scratch.refinenet2(path_3, layer_2_rn, size=layer_1_rn.shape[2:])
         path_1 = self.scratch.refinenet1(path_2, layer_1_rn)
-        
+
         out_depth = self.scratch.output_conv1(path_1)
         out_depth = F.interpolate(out_depth, (int(patch_h * 14), int(patch_w * 14)), mode="bilinear", align_corners=True)
         out_depth = self.scratch.output_conv2(out_depth)
         
-        return out_features, out_depth
-        
+        return (layer_1_rn, layer_2_rn, layer_3_rn, layer_4_rn, path_1, path_2, path_3, path_4), out_depth
         
 class DPT_DINOv2(nn.Module):
     def __init__(self, encoder='vitl', features=256, out_channels=[256, 512, 1024, 1024], use_bn=False, use_clstoken=False, localhub=True):
