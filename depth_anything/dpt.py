@@ -162,7 +162,7 @@ class DPT_DINOv2(nn.Module):
         out_depth = F.interpolate(out_depth, size=(h, w), mode="bilinear", align_corners=True)
         out_depth = F.relu(out_depth)
 
-        return out_features, out_depth.squeeze(1)
+        return out_features, out_depth
 
 
 class DepthAnything(DPT_DINOv2, PyTorchModelHubMixin):

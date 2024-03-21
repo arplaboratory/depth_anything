@@ -246,3 +246,87 @@ class PrepareForNet(object):
             sample["semseg_mask"] = np.ascontiguousarray(sample["semseg_mask"])
 
         return sample
+
+class Flip(object):
+    """Flip the given image."""
+    def __call__(self, sample):
+        sample["image"] = cv2.flip(sample["image"], 0)
+        sample["image"] = cv2.flip(sample["image"], 1)
+        return sample
+
+class Crop(object):
+    """Crop the given image."""
+    def __call__(self, sample):
+        h, w = sample["image"].shape[:2]
+        factor = np.random.randint(low=75, high=95)
+        new_h, new_w = int(h * factor), int(w * factor)
+        y_start, x_start = (h - new_h) // 2, (w - new_w) // 2
+        sample["image"] = sample["image"][y_start:y_start+new_h, x_start:x_start+new_w]
+        sample["image"] = cv2.resize(sample["image"], (w, h))
+        return sample
+
+class Downsample(object):
+    """Downsample the given image."""
+    def __call__(self, sample):
+        h, w = sample["image"].shape[:2]
+        factor = np.random.randint(low=2, high=6)
+        sample["image"] = cv2.resize(sample["image"], (w // factor, h // factor))
+        sample["image"] = cv2.resize(sample["image"], (w, h))
+        return sample
+    
+class Erase(object):
+    """Erase the given image."""
+    def __call__(self, sample):
+        h, w = sample["image"].shape[:2]
+        max_width = int(w * 0.2)   # Maximum width of the rectangle is 20% of image width
+        max_height = int(h * 0.2)  # Maximum height of the rectangle is 20% of image height
+        rect_width = np.random.randint(low=1, high=max_width)
+        rect_height = np.random.randint(low=1, high=max_height)
+        x = np.random.randint(0, w - rect_width)
+        y = np.random.randint(0, h - rect_height)
+        sample["image"][y:y+rect_height, x:x+rect_width] = 0
+        return sample
+
+class Perspective(object):
+    """Perspective the given image."""
+    def __call__(self, sample):
+        h, w = sample["image"].shape[:2]
+        factor = np.random.randint(low=100, high=200)
+        pts1 = np.float32([[factor,factor],[w-factor,factor],
+                            [factor,h-factor],[w-factor,h-factor]])
+        pts2 = pts1 + np.random.uniform(-10,10,pts1.shape).astype(np.float32)
+        M = cv2.getPerspectiveTransform(pts1,pts2)
+        sample["image"] = cv2.warpPerspective(sample["image"], M, (w, h))
+        return sample
+    
+class Color(object):
+    """Color the given image."""
+    def __call__(self, sample):
+        hsv = cv2.cvtColor(sample["image"], cv2.COLOR_BGR2HSV)
+        hsv = np.array(hsv, dtype=np.float64)
+        hsv[:, :, 1] = hsv[:, :, 1]*np.random.uniform(0.9, 1.1) # Saturation change
+        hsv[:, :, 2] = hsv[:, :, 2]*np.random.uniform(0.9, 1.1) # Brightness change
+        hsv[:, :, 0] = hsv[:, :, 0]+np.random.uniform(-10, 10)  # Hue change
+        hsv[:, :, 0][hsv[:, :, 0] > 179] = hsv[:, :, 0][hsv[:, :, 0] > 179]-180
+        hsv[:, :, 0][hsv[:, :, 0] < 0] += 180
+        hsv = np.array(hsv, dtype=np.uint8)
+        sample["image"] = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+        alpha = np.random.uniform(0.9, 1.1)  # Contrast control
+        beta = np.random.randint(-10, 10)    # Brightness control
+        sample["image"] = cv2.convertScaleAbs(sample["image"], alpha=alpha, beta=beta)
+        return sample
+
+class Skewing(object):
+    """Skewing the given image."""
+    def __call__(self, sample):
+        skew_type = np.random.choice(['x', 'y', 'both'])
+        skew_amount = np.random.uniform(0.01, 0.05)
+        if skew_type == 'x':
+            M = np.float32([[1, skew_amount, 0], [0, 1, 0]])
+        elif skew_type == 'y':
+            M = np.float32([[1, 0, 0], [skew_amount, 1, 0]])
+        elif skew_type == 'both':
+            M = np.float32([[1, skew_amount, 0], [skew_amount, 1, 0]])
+        sample["image"] = cv2.warpAffine(\
+            sample["image"], M, (sample["image"].shape[1], sample["image"].shape[0]))
+        return sample
